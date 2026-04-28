@@ -1,0 +1,573 @@
+# AMS Microservices — Main docker-compose
+# Run from: /home/rahat/Documents/My-Projects/sms/
+# Command:  docker compose up --build
+
+x-common-env: &common-env
+  INTERNAL_SERVICE_SECRET: ${INTERNAL_SERVICE_SECRET:-change-this-secret}
+  RABBITMQ_URL: amqp://${RABBITMQ_USER:-guest}:${RABBITMQ_PASS:-guest}@rabbitmq:5672/
+  JWT_SECRET_KEY: ${AUTH_SECRET_KEY:-auth-secret-change-me}
+
+services:
+
+  # ─── Shared Infrastructure ────────────────────────────────────────────────────
+
+  redis:
+    image: redis:7-alpine
+    container_name: ams_redis
+    restart: always
+    # No host port — only reachable inside Docker network (redis://redis:6379)
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    container_name: ams_rabbitmq
+    restart: always
+    ports:
+      - "15674:15672"   # management UI — host system uses 15673
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-guest}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASS:-guest}
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 30s
+      timeout: 30s
+      retries: 10
+      start_period: 60s
+
+  minio:
+    image: minio/minio:latest
+    container_name: ams_minio
+    restart: always
+    ports:
+      - "9200:9000"   # S3 API — host system uses 9100
+      - "9201:9001"   # console UI
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+    volumes:
+      - minio_data:/data
+    command: server /data --console-address ":9001"
+
+  pgadmin:
+    image: dpage/pgadmin4
+    container_name: ams_pgadmin
+    restart: always
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL:-admin@ams.local}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD:-admin}
+    ports:
+      - "8084:80"
+
+  # ─── Per-Service Databases ────────────────────────────────────────────────────
+
+  postgres-auth:
+    image: postgres:15-alpine
+    container_name: ams_db_auth
+    restart: always
+    environment:
+      POSTGRES_DB: auth_db
+      POSTGRES_USER: auth_user
+      POSTGRES_PASSWORD: ${AUTH_DB_PASS:-auth_pass}
+    volumes:
+      - postgres_auth:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U auth_user -d auth_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  postgres-org:
+    image: postgres:15-alpine
+    container_name: ams_db_org
+    restart: always
+    environment:
+      POSTGRES_DB: org_db
+      POSTGRES_USER: org_user
+      POSTGRES_PASSWORD: ${ORG_DB_PASS:-org_pass}
+    volumes:
+      - postgres_org:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U org_user -d org_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  postgres-campus:
+    image: postgres:15-alpine
+    container_name: ams_db_campus
+    restart: always
+    environment:
+      POSTGRES_DB: campus_db
+      POSTGRES_USER: campus_user
+      POSTGRES_PASSWORD: ${CAMPUS_DB_PASS:-campus_pass}
+    volumes:
+      - postgres_campus:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U campus_user -d campus_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  postgres-staff:
+    image: postgres:15-alpine
+    container_name: ams_db_staff
+    restart: always
+    environment:
+      POSTGRES_DB: staff_db
+      POSTGRES_USER: staff_user
+      POSTGRES_PASSWORD: ${STAFF_DB_PASS:-staff_pass}
+    volumes:
+      - postgres_staff:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U staff_user -d staff_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  postgres-student:
+    image: postgres:15-alpine
+    container_name: ams_db_student
+    restart: always
+    environment:
+      POSTGRES_DB: student_db
+      POSTGRES_USER: student_user
+      POSTGRES_PASSWORD: ${STUDENT_DB_PASS:-student_pass}
+    volumes:
+      - postgres_student:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U student_user -d student_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  postgres-attendance:
+    image: postgres:15-alpine
+    container_name: ams_db_attendance
+    restart: always
+    environment:
+      POSTGRES_DB: attendance_db
+      POSTGRES_USER: attendance_user
+      POSTGRES_PASSWORD: ${ATTENDANCE_DB_PASS:-attendance_pass}
+    volumes:
+      - postgres_attendance:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U attendance_user -d attendance_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  postgres-result:
+    image: postgres:15-alpine
+    container_name: ams_db_result
+    restart: always
+    environment:
+      POSTGRES_DB: result_db
+      POSTGRES_USER: result_user
+      POSTGRES_PASSWORD: ${RESULT_DB_PASS:-result_pass}
+    volumes:
+      - postgres_result:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U result_user -d result_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  postgres-fees:
+    image: postgres:15-alpine
+    container_name: ams_db_fees
+    restart: always
+    environment:
+      POSTGRES_DB: fees_db
+      POSTGRES_USER: fees_user
+      POSTGRES_PASSWORD: ${FEES_DB_PASS:-fees_pass}
+    volumes:
+      - postgres_fees:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U fees_user -d fees_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  postgres-timetable:
+    image: postgres:15-alpine
+    container_name: ams_db_timetable
+    restart: always
+    environment:
+      POSTGRES_DB: timetable_db
+      POSTGRES_USER: timetable_user
+      POSTGRES_PASSWORD: ${TIMETABLE_DB_PASS:-timetable_pass}
+    volumes:
+      - postgres_timetable:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U timetable_user -d timetable_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  postgres-notification:
+    image: postgres:15-alpine
+    container_name: ams_db_notification
+    restart: always
+    environment:
+      POSTGRES_DB: notification_db
+      POSTGRES_USER: notification_user
+      POSTGRES_PASSWORD: ${NOTIFICATION_DB_PASS:-notification_pass}
+    volumes:
+      - postgres_notification:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U notification_user -d notification_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  postgres-support:
+    image: postgres:15-alpine
+    container_name: ams_db_support
+    restart: always
+    environment:
+      POSTGRES_DB: support_db
+      POSTGRES_USER: support_user
+      POSTGRES_PASSWORD: ${SUPPORT_DB_PASS:-support_pass}
+    volumes:
+      - postgres_support:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U support_user -d support_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ─── Microservices ─────────────────────────────────────────────────────────────
+
+  auth-service:
+    build:
+      context: .
+      dockerfile: microservices/auth-service/Dockerfile
+    container_name: ams_auth
+    restart: always
+    ports:
+      - "8001:8001"
+    environment:
+      <<: *common-env
+      SECRET_KEY: ${AUTH_SECRET_KEY:-auth-secret-change-me}
+      DB_HOST: postgres-auth
+      DB_PORT: 5432
+      DB_NAME: auth_db
+      DB_USER: auth_user
+      DB_PASSWORD: ${AUTH_DB_PASS:-auth_pass}
+      REDIS_URL: redis://redis:6379/1
+      EMAIL_HOST_USER: ${EMAIL_HOST_USER:-}
+      EMAIL_HOST_PASSWORD: ${EMAIL_HOST_PASSWORD:-}
+      DEFAULT_FROM_EMAIL: ${DEFAULT_FROM_EMAIL:-}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
+    depends_on:
+      postgres-auth:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8001/health/')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  org-service:
+    build:
+      context: .
+      dockerfile: microservices/org-service/Dockerfile
+    container_name: ams_org
+    restart: always
+    ports:
+      - "8002:8002"
+    environment:
+      <<: *common-env
+      SECRET_KEY: ${AUTH_SECRET_KEY:-auth-secret-change-me}
+      DB_HOST: postgres-org
+      DB_NAME: org_db
+      DB_USER: org_user
+      DB_PASSWORD: ${ORG_DB_PASS:-org_pass}
+      REDIS_URL: redis://redis:6379/2
+      AUTH_SERVICE_URL: http://auth-service:8001
+    depends_on:
+      postgres-org:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_started
+
+  campus-service:
+    build:
+      context: .
+      dockerfile: microservices/campus-service/Dockerfile
+    container_name: ams_campus
+    restart: always
+    ports:
+      - "8003:8003"
+    environment:
+      <<: *common-env
+      SECRET_KEY: ${AUTH_SECRET_KEY:-auth-secret-change-me}
+      DB_HOST: postgres-campus
+      DB_NAME: campus_db
+      DB_USER: campus_user
+      DB_PASSWORD: ${CAMPUS_DB_PASS:-campus_pass}
+      REDIS_URL: redis://redis:6379/3
+    depends_on:
+      postgres-campus:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_started
+
+  staff-service:
+    build:
+      context: .
+      dockerfile: microservices/staff-service/Dockerfile
+    container_name: ams_staff
+    restart: always
+    ports:
+      - "8004:8004"
+    environment:
+      <<: *common-env
+      SECRET_KEY: ${AUTH_SECRET_KEY:-auth-secret-change-me}
+      DB_HOST: postgres-staff
+      DB_NAME: staff_db
+      DB_USER: staff_user
+      DB_PASSWORD: ${STAFF_DB_PASS:-staff_pass}
+      REDIS_URL: redis://redis:6379/4
+      CAMPUS_SERVICE_URL: http://campus-service:8003
+    depends_on:
+      postgres-staff:
+        condition: service_healthy
+      campus-service:
+        condition: service_started
+
+  student-service:
+    build:
+      context: .
+      dockerfile: microservices/student-service/Dockerfile
+    container_name: ams_student
+    restart: always
+    ports:
+      - "8005:8005"
+    environment:
+      <<: *common-env
+      SECRET_KEY: ${AUTH_SECRET_KEY:-auth-secret-change-me}
+      DB_HOST: postgres-student
+      DB_NAME: student_db
+      DB_USER: student_user
+      DB_PASSWORD: ${STUDENT_DB_PASS:-student_pass}
+      REDIS_URL: redis://redis:6379/5
+      CAMPUS_SERVICE_URL: http://campus-service:8003
+    depends_on:
+      postgres-student:
+        condition: service_healthy
+      campus-service:
+        condition: service_started
+
+  attendance-service:
+    build:
+      context: .
+      dockerfile: microservices/attendance-service/Dockerfile
+    container_name: ams_attendance
+    restart: always
+    ports:
+      - "8006:8006"
+    environment:
+      <<: *common-env
+      SECRET_KEY: ${AUTH_SECRET_KEY:-auth-secret-change-me}
+      DB_HOST: postgres-attendance
+      DB_NAME: attendance_db
+      DB_USER: attendance_user
+      DB_PASSWORD: ${ATTENDANCE_DB_PASS:-attendance_pass}
+      REDIS_URL: redis://redis:6379/6
+      STAFF_SERVICE_URL: http://staff-service:8004
+      STUDENT_SERVICE_URL: http://student-service:8005
+    depends_on:
+      postgres-attendance:
+        condition: service_healthy
+      staff-service:
+        condition: service_started
+      student-service:
+        condition: service_started
+
+  result-service:
+    build:
+      context: .
+      dockerfile: microservices/result-service/Dockerfile
+    container_name: ams_result
+    restart: always
+    ports:
+      - "8007:8007"
+    environment:
+      <<: *common-env
+      SECRET_KEY: ${AUTH_SECRET_KEY:-auth-secret-change-me}
+      DB_HOST: postgres-result
+      DB_NAME: result_db
+      DB_USER: result_user
+      DB_PASSWORD: ${RESULT_DB_PASS:-result_pass}
+      REDIS_URL: redis://redis:6379/7
+      STUDENT_SERVICE_URL: http://student-service:8005
+    depends_on:
+      postgres-result:
+        condition: service_healthy
+      student-service:
+        condition: service_started
+
+  fees-service:
+    build:
+      context: .
+      dockerfile: microservices/fees-service/Dockerfile
+    container_name: ams_fees
+    restart: always
+    ports:
+      - "8008:8008"
+    environment:
+      <<: *common-env
+      SECRET_KEY: ${AUTH_SECRET_KEY:-auth-secret-change-me}
+      DB_HOST: postgres-fees
+      DB_NAME: fees_db
+      DB_USER: fees_user
+      DB_PASSWORD: ${FEES_DB_PASS:-fees_pass}
+      REDIS_URL: redis://redis:6379/8
+      STUDENT_SERVICE_URL: http://student-service:8005
+    depends_on:
+      postgres-fees:
+        condition: service_healthy
+      student-service:
+        condition: service_started
+
+  timetable-service:
+    build:
+      context: .
+      dockerfile: microservices/timetable-service/Dockerfile
+    container_name: ams_timetable
+    restart: always
+    ports:
+      - "8009:8009"
+    environment:
+      <<: *common-env
+      SECRET_KEY: ${AUTH_SECRET_KEY:-auth-secret-change-me}
+      DB_HOST: postgres-timetable
+      DB_NAME: timetable_db
+      DB_USER: timetable_user
+      DB_PASSWORD: ${TIMETABLE_DB_PASS:-timetable_pass}
+      REDIS_URL: redis://redis:6379/9
+      STUDENT_SERVICE_URL: http://student-service:8005
+      CAMPUS_SERVICE_URL: http://campus-service:8003
+    depends_on:
+      postgres-timetable:
+        condition: service_healthy
+
+  notification-service:
+    build:
+      context: .
+      dockerfile: microservices/notification-service/Dockerfile
+    container_name: ams_notification
+    restart: always
+    ports:
+      - "8010:8010"
+    environment:
+      <<: *common-env
+      SECRET_KEY: ${AUTH_SECRET_KEY:-auth-secret-change-me}
+      DB_HOST: postgres-notification
+      DB_NAME: notification_db
+      DB_USER: notification_user
+      DB_PASSWORD: ${NOTIFICATION_DB_PASS:-notification_pass}
+      REDIS_URL: redis://redis:6379/10
+      EMAIL_HOST_USER: ${EMAIL_HOST_USER:-}
+      EMAIL_HOST_PASSWORD: ${EMAIL_HOST_PASSWORD:-}
+      DEFAULT_FROM_EMAIL: ${DEFAULT_FROM_EMAIL:-}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
+    depends_on:
+      postgres-notification:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  support-service:
+    build:
+      context: .
+      dockerfile: microservices/support-service/Dockerfile
+    container_name: ams_support
+    restart: always
+    ports:
+      - "8011:8011"
+    environment:
+      <<: *common-env
+      SECRET_KEY: ${AUTH_SECRET_KEY:-auth-secret-change-me}
+      DB_HOST: postgres-support
+      DB_NAME: support_db
+      DB_USER: support_user
+      DB_PASSWORD: ${SUPPORT_DB_PASS:-support_pass}
+      REDIS_URL: redis://redis:6379/11
+    depends_on:
+      postgres-support:
+        condition: service_healthy
+
+  # ─── Frontend Service ─────────────────────────────────────────────────────────
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: ../microservices/frontend-service/Dockerfile
+      args:
+        INTERNAL_API_URL: http://gateway
+        NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-http://localhost}
+        NEXT_PUBLIC_WS_BASE_URL: ${NEXT_PUBLIC_WS_BASE_URL:-}
+    container_name: ams_frontend
+    restart: always
+    ports:
+      - "3000:3000"
+    environment:
+      INTERNAL_API_URL: http://gateway
+      NEXT_PUBLIC_WS_BASE_URL: ${NEXT_PUBLIC_WS_BASE_URL:-}
+      NODE_ENV: production
+    depends_on:
+      auth-service:
+        condition: service_healthy
+
+  # ─── API Gateway ──────────────────────────────────────────────────────────────
+
+  gateway:
+    image: nginx:1.25-alpine
+    container_name: ams_gateway
+    restart: always
+    ports:
+      - "${NGINX_HTTP_PORT:-80}:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./nginx/proxy_params:/etc/nginx/proxy_params:ro
+      - /etc/letsencrypt:/etc/letsencrypt:ro
+    depends_on:
+      auth-service:
+        condition: service_started
+      frontend:
+        condition: service_started
+
+volumes:
+  redis_data:
+  rabbitmq_data:
+  minio_data:
+  postgres_auth:
+  postgres_org:
+  postgres_campus:
+  postgres_staff:
+  postgres_student:
+  postgres_attendance:
+  postgres_result:
+  postgres_fees:
+  postgres_timetable:
+  postgres_notification:
+  postgres_support:

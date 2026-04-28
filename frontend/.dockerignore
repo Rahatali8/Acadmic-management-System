@@ -1,0 +1,14 @@
+node_modules
+.next
+.git
+*.log
+.env*.local
+.env.development
+.env.production
+README.md
+Dockerfile
+.dockerignore
+**/__pycache__
+**/*.pyc
+.vscode
+.idea

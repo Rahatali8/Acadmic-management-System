@@ -1,0 +1,180 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ams-ingress
+  namespace: ams-production
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "120"
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "30"
+    nginx.ingress.kubernetes.io/use-regex: "true"
+spec:
+  tls:
+    - hosts:
+        - sms.idaraalkhair.sbs
+      secretName: ams-tls
+  rules:
+    - host: sms.idaraalkhair.sbs
+      http:
+        paths:
+          # Auth
+          - path: /api/auth/
+            pathType: Prefix
+            backend:
+              service:
+                name: auth-service
+                port:
+                  number: 8001
+          # Org
+          - path: /api/org/
+            pathType: Prefix
+            backend:
+              service:
+                name: org-service
+                port:
+                  number: 8002
+          # Campus
+          - path: /api/campus/
+            pathType: Prefix
+            backend:
+              service:
+                name: campus-service
+                port:
+                  number: 8003
+          - path: /api/classes/
+            pathType: Prefix
+            backend:
+              service:
+                name: campus-service
+                port:
+                  number: 8003
+          # Staff
+          - path: /api/teachers/
+            pathType: Prefix
+            backend:
+              service:
+                name: staff-service
+                port:
+                  number: 8004
+          - path: /api/coordinators/
+            pathType: Prefix
+            backend:
+              service:
+                name: staff-service
+                port:
+                  number: 8004
+          - path: /api/principals/
+            pathType: Prefix
+            backend:
+              service:
+                name: staff-service
+                port:
+                  number: 8004
+          # Students
+          - path: /api/students/
+            pathType: Prefix
+            backend:
+              service:
+                name: student-service
+                port:
+                  number: 8005
+          - path: /api/behaviour/
+            pathType: Prefix
+            backend:
+              service:
+                name: student-service
+                port:
+                  number: 8005
+          # Attendance + ZKTeco
+          - path: /api/attendance/
+            pathType: Prefix
+            backend:
+              service:
+                name: attendance-service
+                port:
+                  number: 8006
+          - path: /iclock/
+            pathType: Prefix
+            backend:
+              service:
+                name: attendance-service
+                port:
+                  number: 8006
+          # Results
+          - path: /api/result/
+            pathType: Prefix
+            backend:
+              service:
+                name: result-service
+                port:
+                  number: 8007
+          - path: /api/results/
+            pathType: Prefix
+            backend:
+              service:
+                name: result-service
+                port:
+                  number: 8007
+          # Fees
+          - path: /api/fees/
+            pathType: Prefix
+            backend:
+              service:
+                name: fees-service
+                port:
+                  number: 8008
+          # Timetable + Transfers
+          - path: /api/timetable/
+            pathType: Prefix
+            backend:
+              service:
+                name: timetable-service
+                port:
+                  number: 8009
+          - path: /api/transfers/
+            pathType: Prefix
+            backend:
+              service:
+                name: timetable-service
+                port:
+                  number: 8009
+          # Notifications (HTTP + WebSocket)
+          - path: /api/notifications/
+            pathType: Prefix
+            backend:
+              service:
+                name: notification-service
+                port:
+                  number: 8010
+          - path: /ws/
+            pathType: Prefix
+            backend:
+              service:
+                name: notification-service
+                port:
+                  number: 8010
+          # Support
+          - path: /api/requests/
+            pathType: Prefix
+            backend:
+              service:
+                name: support-service
+                port:
+                  number: 8011
+          - path: /api/form-builder/
+            pathType: Prefix
+            backend:
+              service:
+                name: support-service
+                port:
+                  number: 8011
+          # Frontend (catch-all — must be last)
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: frontend
+                port:
+                  number: 3000

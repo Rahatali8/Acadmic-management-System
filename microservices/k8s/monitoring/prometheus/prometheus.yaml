@@ -1,0 +1,117 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-config
+  namespace: ams-production
+data:
+  prometheus.yml: |
+    global:
+      scrape_interval: 15s
+      evaluation_interval: 15s
+
+    scrape_configs:
+      - job_name: auth-service
+        static_configs:
+          - targets: ['auth-service:8001']
+        metrics_path: /metrics/
+
+      - job_name: org-service
+        static_configs:
+          - targets: ['org-service:8002']
+
+      - job_name: campus-service
+        static_configs:
+          - targets: ['campus-service:8003']
+
+      - job_name: staff-service
+        static_configs:
+          - targets: ['staff-service:8004']
+
+      - job_name: student-service
+        static_configs:
+          - targets: ['student-service:8005']
+
+      - job_name: attendance-service
+        static_configs:
+          - targets: ['attendance-service:8006']
+
+      - job_name: result-service
+        static_configs:
+          - targets: ['result-service:8007']
+
+      - job_name: fees-service
+        static_configs:
+          - targets: ['fees-service:8008']
+
+      - job_name: timetable-service
+        static_configs:
+          - targets: ['timetable-service:8009']
+
+      - job_name: notification-service
+        static_configs:
+          - targets: ['notification-service:8010']
+
+      - job_name: support-service
+        static_configs:
+          - targets: ['support-service:8011']
+
+      - job_name: rabbitmq
+        static_configs:
+          - targets: ['rabbitmq:15692']
+
+      - job_name: redis
+        static_configs:
+          - targets: ['redis-exporter:9121']
+
+      - job_name: kubernetes-pods
+        kubernetes_sd_configs:
+          - role: pod
+            namespaces:
+              names: ['ams-production']
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: prometheus
+  namespace: ams-production
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: prometheus
+  template:
+    metadata:
+      labels:
+        app: prometheus
+    spec:
+      containers:
+        - name: prometheus
+          image: prom/prometheus:latest
+          ports:
+            - containerPort: 9090
+          volumeMounts:
+            - name: config
+              mountPath: /etc/prometheus/
+            - name: data
+              mountPath: /prometheus/
+          args:
+            - "--config.file=/etc/prometheus/prometheus.yml"
+            - "--storage.tsdb.retention.time=30d"
+      volumes:
+        - name: config
+          configMap:
+            name: prometheus-config
+        - name: data
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: prometheus
+  namespace: ams-production
+spec:
+  selector:
+    app: prometheus
+  ports:
+    - port: 9090
+      targetPort: 9090

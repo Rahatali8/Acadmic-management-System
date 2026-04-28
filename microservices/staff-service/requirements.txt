@@ -1,0 +1,17 @@
+Django>=5.0,<6.0
+djangorestframework
+djangorestframework-simplejwt
+psycopg2-binary
+django-cors-headers
+redis
+django-redis
+django-filter
+python-dotenv
+gunicorn
+whitenoise
+Pillow
+pika
+pandas>=2.1.0
+django-phonenumber-field[phonenumbers]
+ams-shared @ file:///app/ams-shared
+django-cleanup

@@ -1,0 +1,53 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: campus-service
+  namespace: ams-production
+  labels:
+    app: campus-service
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: campus-service
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        app: campus-service
+    spec:
+      containers:
+        - name: campus-service
+          image: registry.example.com/ams/campus-serviceatest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8003
+          envFrom:
+            - configMapRef:
+                name: campus-service-config
+            - secretRef:
+                name: campus-service-secret
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "256Mi"
+            limits:
+              cpu: "1"
+              memory: "1Gi"
+          livenessProbe:
+            httpGet:
+              path: /health/
+              port: 8003
+            initialDelaySeconds: 30
+            periodSeconds: 30
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /health/
+              port: 8003
+            initialDelaySeconds: 15
+            periodSeconds: 10

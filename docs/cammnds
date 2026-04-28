@@ -1,0 +1,173 @@
+# Project Commands & Scripts
+
+All commands for the AMS microservices project.
+
+---
+
+## Docker — Start / Stop
+
+```bash
+# Start everything (first time or after code changes)
+docker compose up --build
+
+# Start without rebuilding
+docker compose up -d
+
+# Stop all
+docker compose down
+
+# Restart single service
+docker compose restart auth-service
+
+# Rebuild single service
+docker compose up -d --build auth-service
+```
+
+---
+
+## Superuser — Create
+
+```bash
+# Auth service (most common — login / user management)
+docker exec -it ams_auth python manage.py createsuperuser
+
+# Other services
+docker exec -it ams_org          python manage.py createsuperuser
+docker exec -it ams_campus       python manage.py createsuperuser
+docker exec -it ams_staff        python manage.py createsuperuser
+docker exec -it ams_student      python manage.py createsuperuser
+docker exec -it ams_attendance   python manage.py createsuperuser
+docker exec -it ams_result       python manage.py createsuperuser
+docker exec -it ams_fees         python manage.py createsuperuser
+docker exec -it ams_timetable    python manage.py createsuperuser
+docker exec -it ams_notification python manage.py createsuperuser
+docker exec -it ams_support      python manage.py createsuperuser
+```
+
+---
+
+## Superuser — Fix / Reset
+
+```bash
+# Change password
+docker exec -it ams_auth python manage.py changepassword <email>
+
+# Give superuser + staff rights via shell
+docker exec -it ams_auth python manage.py shell
+# Then paste:
+from django.contrib.auth import get_user_model
+User = get_user_model()
+u = User.objects.get(email='your@email.com')
+u.is_staff = True
+u.is_superuser = True
+u.save()
+print("Done!")
+```
+
+---
+
+## Migrations
+
+```bash
+# Run migrations (single service)
+docker exec -it ams_auth python manage.py migrate
+
+# Make migrations (single service)
+docker exec -it ams_auth python manage.py makemigrations
+
+# All services at once
+for c in ams_auth ams_org ams_campus ams_staff ams_student ams_attendance ams_result ams_fees ams_timetable ams_notification ams_support; do
+  echo "=== $c ===" && docker exec $c python manage.py migrate
+done
+```
+
+---
+
+## Management Commands (Auth service)
+
+```bash
+# Seed subscription plans (Basic / Standard / Enterprise)
+docker exec -it ams_auth python manage.py seed_plans
+
+# Seed role-based permissions
+docker exec -it ams_auth python manage.py seed_permissions
+
+# Create user interactively
+docker exec -it ams_auth python manage.py create_user
+```
+
+---
+
+## Logs
+
+```bash
+# Follow logs of a service
+docker logs -f ams_auth
+
+# Last 50 lines
+docker logs ams_auth --tail 50
+
+# Gateway (nginx)
+docker logs -f ams_gateway
+```
+
+---
+
+## Django Admin URLs (Local)
+
+| Service       | URL                              |
+|---------------|----------------------------------|
+| Auth          | http://localhost:8001/admin/     |
+| Org           | http://localhost:8002/admin/     |
+| Campus        | http://localhost:8003/admin/     |
+| Staff         | http://localhost:8004/admin/     |
+| Student       | http://localhost:8005/admin/     |
+| Attendance    | http://localhost:8006/admin/     |
+| Result        | http://localhost:8007/admin/     |
+| Fees          | http://localhost:8008/admin/     |
+| Timetable     | http://localhost:8009/admin/     |
+| Notification  | http://localhost:8010/admin/     |
+| Support       | http://localhost:8011/admin/     |
+
+---
+
+## Django Admin URLs (Production — SSH Tunnel)
+
+```bash
+# Run this on your local machine to tunnel all admin ports
+ssh -L 8001:localhost:8001 \
+    -L 8002:localhost:8002 \
+    -L 8003:localhost:8003 \
+    -L 8004:localhost:8004 \
+    -L 8005:localhost:8005 \
+    -L 8006:localhost:8006 \
+    -L 8007:localhost:8007 \
+    -L 8008:localhost:8008 \
+    -L 8009:localhost:8009 \
+    -L 8010:localhost:8010 \
+    -L 8011:localhost:8011 \
+    user@sms.idaraalkhair.sbs -N
+```
+
+Then open same URLs as local (http://localhost:8001/admin/ etc.)
+
+---
+
+## Login ID Format
+
+| Role                 | ID Format           |
+|----------------------|---------------------|
+| Super Admin          | S-25-XXXX           |
+| Org Admin            | OA-25-XXXX          |
+| Principal            | C01-X-YY-P-XXXX     |
+| Coordinator          | C01-X-YY-C-XXXX     |
+| Teacher              | C01-X-YY-T-XXXX     |
+| Accounts Officer     | C01-X-YY-AO-XXXX    |
+| Admissions Counselor | C01-X-YY-AC-XXXX    |
+| Compliance Officer   | C01-X-YY-CO-XXXX    |
+| Donor                | D-25-XXXX           |
+
+Login via **Email** or **Employee Code** — both work.
+
+---
+*Last updated: April 26, 2026*

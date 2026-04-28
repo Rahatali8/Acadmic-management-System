@@ -1,0 +1,39 @@
+# VCS
+.git
+.gitignore
+.github
+
+# Frontend build artifacts (not needed for Django service builds)
+frontend/node_modules
+frontend/.next
+frontend/.env*.local
+frontend/.env.development
+
+# Python caches
+**/__pycache__
+**/*.pyc
+**/*.pyo
+**/*.pyd
+**/.pytest_cache
+**/htmlcov
+**/.coverage
+
+# Docs and non-code
+docs
+*.md
+*.txt
+!microservices/**/requirements.txt
+
+# Dev tooling
+.vscode
+.idea
+**/*.swp
+**/.DS_Store
+
+# Logs
+**/*.log
+**/logs
+
+# Environment files (never bake secrets into images)
+**/.env
+!**/.env.example

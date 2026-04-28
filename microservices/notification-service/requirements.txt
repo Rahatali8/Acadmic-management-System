@@ -1,0 +1,17 @@
+Django>=5.0,<6.0
+djangorestframework
+djangorestframework-simplejwt
+psycopg2-binary
+django-cors-headers
+redis
+django-redis
+django-filter
+python-dotenv
+daphne
+channels
+channels-redis
+whitenoise
+pika
+Pillow
+psutil
+ams-shared @ file:///app/ams-shared

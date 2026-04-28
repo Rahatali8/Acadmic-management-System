@@ -1,0 +1,53 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: timetable-service
+  namespace: ams-production
+  labels:
+    app: timetable-service
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: timetable-service
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        app: timetable-service
+    spec:
+      containers:
+        - name: timetable-service
+          image: registry.example.com/ams/timetable-serviceatest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8009
+          envFrom:
+            - configMapRef:
+                name: timetable-service-config
+            - secretRef:
+                name: timetable-service-secret
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "256Mi"
+            limits:
+              cpu: "1"
+              memory: "1Gi"
+          livenessProbe:
+            httpGet:
+              path: /health/
+              port: 8009
+            initialDelaySeconds: 30
+            periodSeconds: 30
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /health/
+              port: 8009
+            initialDelaySeconds: 15
+            periodSeconds: 10
